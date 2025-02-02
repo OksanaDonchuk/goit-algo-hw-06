@@ -1,5 +1,6 @@
 import networkx as nx
 import matplotlib.pyplot as plt
+import heapq # Для пріоритетної черги
 from typing import Dict, List, Tuple
 
 def create_weighted_graph() -> nx.DiGraph:
@@ -74,30 +75,44 @@ def visualize_graph(graph: nx.DiGraph) -> None:
     plt.title("Мій шлях на роботу")
     plt.show()
 
-def find_shortest_paths(graph: nx.DiGraph) -> Dict[str, Dict[str, Tuple[List[str], float]]]:
+def dijkstra(graph: nx.DiGraph, start: str) -> Dict[str, Tuple[float, List[str]]]:
     """
-    Використовує алгоритм Дейкстри для знаходження найкоротших шляхів між усіма вершинами.
+    Реалізує алгоритм Дейкстри для знаходження найкоротших шляхів у графі.
 
     Args:
-        graph (nx.DiGraph): Орієнтований зважений граф.
+        graph (nx.DiGraph): Орієнтований граф.
+        start (str): Початкова вершина.
 
     Returns:
-        Dict[str, Dict[str, Tuple[List[str], float]]]: Словник найкоротших шляхів та їхньої довжини між усіма вершинами.
+        Dict[str, Tuple[float, List[str]]]: Словник, де ключ – вершина, а значення – кортеж (мінімальна відстань, маршрут).
     """
-    shortest_paths: Dict[str, Dict[str, Tuple[List[str], float]]] = {}
+    # Ініціалізуємо відстані до всіх вершин як "нескінченність"
+    distances = {node: float('inf') for node in graph.nodes}
+    distances[start] = 0  # Відстань до стартової вершини = 0
 
-    for source in graph.nodes:
-        shortest_paths[source] = {}
-        for target in graph.nodes:
-            if source != target:
-                try:
-                    path = nx.dijkstra_path(graph, source=source, target=target)
-                    distance = nx.dijkstra_path_length(graph, source=source, target=target)
-                    shortest_paths[source][target] = (path, distance)
-                except nx.NetworkXNoPath:
-                    shortest_paths[source][target] = ([], float('inf'))  # Якщо шлях не існує
-    
-    return shortest_paths
+    # Ініціалізуємо маршрути (спочатку кожна вершина має порожній маршрут)
+    paths = {node: [] for node in graph.nodes}
+    paths[start] = [start]  # Стартова вершина сама собі маршрут
+
+    # Використовуємо пріоритетну чергу для вибору вершини з мінімальною відстанню
+    priority_queue = [(0, start)]  # (відстань, вершина)
+
+    while priority_queue:
+        current_distance, current_node = heapq.heappop(priority_queue)
+
+        # Перебираємо сусідів поточної вершини
+        for neighbor in graph.neighbors(current_node):
+            weight = graph[current_node][neighbor]["weight"]
+            distance = current_distance + weight
+
+            # Якщо знайдено коротший шлях до сусіда - оновлюємо
+            if distance < distances[neighbor]:
+                distances[neighbor] = distance
+                paths[neighbor] = paths[current_node] + [neighbor]
+                heapq.heappush(priority_queue, (distance, neighbor))
+
+    # Повертаємо результат у вигляді словника {вершина: (мінімальна відстань, шлях)}
+    return {node: (distances[node], paths[node]) for node in graph.nodes}
 
 if __name__ == "__main__":
     # Створюємо граф із вагами
@@ -106,21 +121,13 @@ if __name__ == "__main__":
     # Візуалізуємо граф
     visualize_graph(graph)
 
-    # Знаходимо найкоротші маршрути від усіх вершин
-    shortest_paths = find_shortest_paths(graph)
+    # Вибираємо стартову вершину
+    start = "Дім"
 
-    # Виводимо найкоротший шлях від "Дім" до "Робота"
-    start, target = "Дім", "Робота"
-    if target in shortest_paths[start]:
-        path, distance = shortest_paths[start][target]
-        print(f"\nНайкоротший шлях від '{start}' до '{target}': {path}")
-        print(f"Відстань: {distance}")
-    else:
-        print(f"Шляху від '{start}' до '{target}' не існує.")
+    # Виконуємо алгоритм Дейкстри
+    shortest_paths = dijkstra(graph, start)
 
-    # Вивід усіх найкоротших шляхів
-    print("\nНайкоротші шляхи між усіма вершинами:")
-    for src, targets in shortest_paths.items():
-        for dest, (path, dist) in targets.items():
-            if path:
-                print(f"🔹 Від {src} до {dest}: {path}, відстань = {dist}")
+    # Виводимо найкоротші шляхи від "Дім" до всіх вершин
+    print("\n🔍 Найкоротші шляхи від вершини 'Дім':")
+    for node, (distance, path) in shortest_paths.items():
+        print(f"🔹 Від 'Дім' до '{node}': шлях = {path}, відстань = {distance}")
